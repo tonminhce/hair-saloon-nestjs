@@ -1,0 +1,418 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// field name are in snakecase
+// use `prisma format` command
+// VARCHAR(255) for all string field except Phone number
+// free text field = 255 * 4 = 1020
+// All numeric fields are defined with minimal possible datatype to optimize storage & performance
+// Store time (no date) in string: "15:00"
+// Store datetime & date in JS Date object
+// Resources with Soft Delete: Store, Stylist, Survey
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerCategory {
+  man // male + adult = man
+  woman // female + adult = woman
+  boy
+  girl
+  NONE
+}
+
+// calling + waiting + standing = no. waiting customers on the monitor
+enum Status {
+  calling
+  waiting
+  standing
+  expired
+  served
+}
+
+enum AgeGroup {
+  a0_10
+  a11_19
+  a20_29
+  a30_39
+  a40_49
+  a50 // 50+
+}
+
+enum TimeSlot {
+  a0_1
+  a1_2
+  a2_3
+  a3_4
+  a4_5
+  a5_6
+  a6_7
+  a7_8
+  a8_9
+  a9_10
+  a10_11
+  a11_12
+  a12_13
+  a13_14
+  a14_15
+  a15_16
+  a16_17
+  a17_18
+  a18_19
+  a19_20
+  a20_21
+  a21_22
+  a22_23
+  a23_24
+}
+
+enum DayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+model Ticket {
+  id                Int              @id @default(autoincrement())
+  customer_category CustomerCategory
+  first_call_time   DateTime?        @db.Timestamp(0) // first call time + 30min = expired time
+  status            Status           @default(waiting)
+
+  customer_phone String? @db.VarChar(13)
+  // Do not hold referential integrity because without cutting, Customer won't be created
+  // Customer       Customer? @relation(fields: [customer_phone], references: [phone])
+
+  queue_id Int @db.SmallInt
+  store_id Int @db.SmallInt
+
+  // it must refer to stylist, not stylistStore because this table is clear daily
+  stylist_id Int?     @db.SmallInt
+  stylist    Stylist? @relation(fields: [stylist_id], references: [id])
+
+  // this foreign key ensure that this ticket is served by a stylist working in the store (that this ticket belongs to)
+  // the verification of all values is skipped if any column contains NULL value.
+  // first, a ticket has no stylist_id -> verification skipped. After cutting started -> add stylist_id -> verification
+  // store_working_stylist StylistStore? @relation(fields: [store_id, stylist_id], references: [working_store_id, stylist_id])
+
+  age_group  AgeGroup?
+  start_time DateTime? @db.Timestamp(0)
+  end_time   DateTime? @db.Timestamp(0)
+  // incase store change price during the day -> end of day report calculation will be incorrect
+  // price determined at the ticket issue timestamp
+  // Should have the same data type as Ticket per category price
+  price      Int
+
+  // if this is the first time customer visit this store
+  is_first_time Boolean?
+
+  created_at   DateTime? @default(now()) @db.Timestamp(0) // also represent ticket issue time
+  updated_at   DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at   DateTime? @db.Timestamp(0)
+  waiting_time Float?    @db.Real // minute
+
+  time_slot      TimeSlot?
+  day_of_week    DayOfWeek?
+  time_zone_date DateTime?  @db.Date
+
+  @@index([created_at, store_id, status]) // find ticket with status (eg. calling) in a store
+  @@index([stylist_id])
+  @@index([customer_category])
+  @@index([time_zone_date])
+}
+
+enum StoreType {
+  STREET_STORE
+  SHOPPING_CENTER
+  STATION
+}
+
+model Store {
+  id      Int     @id @default(autoincrement()) @db.SmallInt
+  name    String  @db.VarChar(50)
+  address String? @db.VarChar(200)
+
+  // Format: 9:00 AM - 7:00 PM
+  businessHoursWeekdays String?
+  // Format: 9:00 AM - 7:00 PM
+  businessHoursWeekends String?
+
+  // largest price: 2'147'483'647
+  man_price   Int
+  woman_price Int
+  boy_price   Int
+  girl_price  Int
+
+  next_queue_id    Int            @default(1) @db.SmallInt
+  stylists         Stylist[]
+  working_stylists StylistStore[]
+
+  seat_count        Int       @db.SmallInt
+  store_type        StoreType
+  store_type_text   String?   @db.VarChar(50)
+  area              Decimal   @db.Decimal(5, 2)
+  opened_date       DateTime? @db.Date
+  person_in_charge1 String?   @db.VarChar(50)
+  person_in_charge2 String?   @db.VarChar(50)
+  notes             String?   @db.VarChar(200)
+  image_uuid        String?   @default(uuid()) @db.Uuid
+  created_at        DateTime? @default(now()) @db.Timestamp(0)
+  updated_at        DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at        DateTime? @db.Timestamp(0)
+
+  // custom columns
+  custom_data Json @default("{}")
+
+  action          Action[]
+  customer_visits CustomerStore[]
+  Survey          Survey[]
+}
+
+// For admin dashboard
+enum StylistStatus {
+  Active
+  Inactive
+}
+
+enum WorkType {
+  FullTime
+  PartTime
+}
+
+enum Gender {
+  Male
+  Female
+  Other
+}
+
+model Stylist {
+  id                  Int           @id @default(autoincrement()) @db.SmallInt
+  status              StylistStatus
+  name                String        @db.VarChar(50)
+  gender              Gender?
+  phone_number        String        @db.VarChar(13)
+  email               String?       @db.VarChar(100)
+  date_of_birth       DateTime?     @db.Date
+  date_hired          DateTime?     @db.Date
+  position            String?       @db.VarChar(50)
+  work_type           WorkType?
+  living_area         String?       @db.VarChar(200)
+  registered_store_id Int           @db.SmallInt
+  store_id            Store         @relation(fields: [registered_store_id], references: [id])
+
+  notes      String? @db.VarChar(200)
+  image_uuid String? @default(uuid()) @db.Uuid
+
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  // custom columns
+  custom_data Json @default("{}")
+
+  // relationship
+  working_store StylistStore? // 1:1 without total participation
+  Ticket        Ticket[]
+
+  @@index([registered_store_id, status])
+}
+
+// Use this in Action table to tracking total working time of a stylist
+// So no need to check cutting status
+// Mainly for reporting purpose
+enum ActionType {
+  check_in_out
+}
+
+// Use this in StylistStore table to represent real-time status of a stylist
+enum StylistRealTimeStatus {
+  available
+  cutting
+  unavailable
+}
+
+// PARTITION TABLE FOR `STYLIST`
+model StylistStore {
+  stylist_id       Int                   @id @db.SmallInt
+  working_store_id Int                   @db.SmallInt
+  store            Store                 @relation(fields: [working_store_id], references: [id])
+  stylist          Stylist               @relation(fields: [stylist_id], references: [id])
+  seat_number      Int?                  @db.SmallInt
+  // latest status of a stylist
+  real_time_status StylistRealTimeStatus @default(unavailable)
+
+  current_cutting_ticket_id Int? @db.SmallInt
+
+  // relationship
+  // working_stylist Ticket[]
+  // action          Action[]
+
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  // unique condition does not check if seat number is empty
+  @@unique([working_store_id, seat_number])
+  // this is naturally true because stylist_id is unique (@id). One stylist can only work in one store
+  @@unique([working_store_id, stylist_id])
+}
+
+model Customer {
+  phone String  @id @db.VarChar(13)
+  name  String? @db.VarChar(255)
+
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  // relationship
+  store_visits CustomerStore[]
+}
+
+model CustomerStore {
+  customer_phone String
+  customer       Customer @relation(fields: [customer_phone], references: [phone])
+
+  store_id Int   @db.SmallInt
+  store    Store @relation(fields: [store_id], references: [id])
+
+  visit_count Int @db.SmallInt
+
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  @@id([customer_phone, store_id])
+}
+
+// Because this table may grow fast while having relatively small number of subclasses attribute,
+// it is reasonable to use one relation with discrimination field (type)
+// This mapping will minizmize the need of join/union when execute queries for the tradeoff of NULL values in some attributes
+model Action {
+  id         Int @id @default(autoincrement())
+  stylist_id Int @db.SmallInt
+  // stylist    StylistStore @relation(fields: [stylist_id], references: [stylist_id])
+
+  store_id Int   @db.SmallInt // enter, leave store
+  store    Store @relation(fields: [store_id], references: [id])
+
+  type          ActionType
+  checkin_time  DateTime?  @db.Timestamp(0) // only apply to check_in_out event
+  checkout_time DateTime?  @db.Timestamp(0) // only apply to check_in_out event
+
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  time_zone_date DateTime? @db.Date
+
+  @@index([created_at])
+  @@index([store_id, checkout_time])
+  @@index([time_zone_date])
+}
+
+model Report {
+  id   Int      @id @default(autoincrement())
+  date DateTime @db.Date
+
+  // No referential integrity on fact table because this table store historical data.
+  // The operational tables may change which lead to failure in referential integrity
+  store_id   Int @db.SmallInt
+  stylist_id Int @db.SmallInt
+
+  stylist_name String
+  store_name   String
+
+  customer_category CustomerCategory?
+
+  number_haircuts Int @default(0) @db.SmallInt
+
+  // max revenue is (10 billions - 1). Should be enough for each record of daily granularity
+  // ∑ (price of tickets): price of each category may change during the day may lead to incorrect report.
+  revenue Float @default(0) @db.Real
+
+  // ∑(unavailable_time - available_time) => seconds => hours
+  // for each start_work -> look back in time to find first pause_work
+  total_hours Float @default(0) @db.Real
+
+  // ∑ of many (finish_ticket - start_ticket) => seconds => hours
+  cutting_hours Float @default(0) @db.Real
+
+  // cutting_hours / total_hours
+  operation_rate Float @default(0) @db.Real
+
+  // cutting_hours / number_haircuts => minutes
+  avg_cut_time Float @default(10) @db.Real
+
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  // unique already create an index automatically
+  @@unique([date, store_id, stylist_id, customer_category])
+}
+
+model Survey {
+  // default Survey has id = 1
+  id        Int    @id @default(autoincrement())
+  store_id  Int?   @db.SmallInt
+  store     Store? @relation(fields: [store_id], references: [id])
+  form_link String @db.VarChar(2048)
+
+  // note: there is extra check constraint to ensure that start_date < end_date. Injected manually by running
+  start_date DateTime? @db.Date
+  end_date   DateTime? @db.Date
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @updatedAt @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+}
+
+enum DataType {
+  text
+  number
+  select
+  date
+  email
+  password
+  telephone
+  url
+}
+
+enum AllowedModel {
+  store
+  stylist
+}
+
+model Meta {
+  table_name        AllowedModel
+  accessorKey       String
+  header            String
+  type              DataType
+  editSelectOptions String[]     @default([])
+  deleted_at        DateTime?    @db.Timestamp(0)
+
+  @@id([table_name, accessorKey])
+  @@index([table_name])
+}
+
+enum TokenType {
+  access_token
+  refresh_token
+}
+
+model Token {
+  type  TokenType @id
+  value String
+}
