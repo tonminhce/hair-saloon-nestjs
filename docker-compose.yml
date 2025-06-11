@@ -1,0 +1,164 @@
+networks:
+    qbhouse_intranet:
+        driver: bridge
+        ipam:
+            driver: default
+            config:
+                - subnet: 10.93.0.0/16
+services:
+    base: 
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              SRC_DIR: ./backend
+              COMPONENT: base
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/base/Dockerfile"
+        image: "${BASE_IMAGE}"
+        restart: on-failure
+        container_name: "${PROJECT}-base"
+        ports:
+          - 3000
+        networks:
+            - qbhouse_intranet
+    proxy: 
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              SRC_DIR: ./infras/docker/components/proxy
+              COMPONENT: proxy
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/proxy/Dockerfile"
+        restart: unless-stopped
+        container_name: "${PROJECT}-proxy"
+        ports:
+          - 80:80
+        networks:
+            - qbhouse_intranet
+    backend: 
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              BASE_IMAGE: ${BASE_IMAGE}
+              SRC_DIR: ./backend
+              COMPONENT: backend
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/backend/Dockerfile"
+        restart: unless-stopped
+        container_name: "${PROJECT}-backend"
+        volumes:
+          - ./backend/src:/app/src
+        env_file:
+            - "./infras/docker/env/${ENVIRONMENT}/.env.backend"
+        depends_on: [db]
+        networks:
+            - qbhouse_intranet
+    db:
+      platform: "linux/amd64"
+      image: postgres:16
+      container_name: "${PROJECT}-db"
+      ports:
+        - 5432:5432
+      volumes:
+        - ./infras/docker/components/local_db/data:/var/lib/postgresql/data
+      environment:
+        POSTGRES_USER: ${DB_USER}
+        POSTGRES_PASSWORD: ${DB_PASSWORD}
+        POSTGRES_DB: ${DB_NAME}
+      networks:
+        - qbhouse_intranet
+    admin: 
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              SRC_DIR: ./admin
+              COMPONENT: admin
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/admin/Dockerfile${POSTFIX}"
+        image: "${PROJECT}-admin"
+        restart: on-failure
+        container_name: "${PROJECT}-admin"
+        ports:
+          - 81:80
+        env_file:
+          - "./infras/docker/env/${ENVIRONMENT}/.env.admin" 
+        networks:
+          - qbhouse_intranet
+    customer:
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              SRC_DIR: ./customer-mobile
+              COMPONENT: customer
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/customer/Dockerfile${POSTFIX}"
+        image: "${PROJECT}-customer"
+        restart: on-failure
+        container_name: "${PROJECT}-customer"
+        env_file:
+          - "./infras/docker/env/${ENVIRONMENT}/.env.customer" 
+        ports:
+          - 82:80
+        networks:
+          - qbhouse_intranet
+    store:
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              SRC_DIR: ./in-store-queue
+              COMPONENT: store
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/store/Dockerfile${POSTFIX}"
+        image: "${PROJECT}-store"
+        restart: on-failure
+        container_name: "${PROJECT}-store"
+        env_file:
+          - "./infras/docker/env/${ENVIRONMENT}/.env.store" 
+        ports:
+          - 83:80
+        networks:
+          - qbhouse_intranet
+    stylist:
+        platform: "linux/amd64"
+        build:
+            platforms:
+              - "linux/amd64"
+            args:
+              SRC_DIR: ./stylist-tracking
+              COMPONENT: stylist
+              ENVIRONMENT: ${ENVIRONMENT}
+            context: .
+            dockerfile: "./infras/docker/components/stylist/Dockerfile${POSTFIX}"
+        image: "${PROJECT}-stylist"
+        restart: on-failure
+        container_name: "${PROJECT}-stylist"
+        env_file:
+          - "./infras/docker/env/${ENVIRONMENT}/.env.stylist" 
+        ports:
+          - 84:80
+        networks:
+          - qbhouse_intranet
+volumes:
+  node_modules:
+    driver: local
+  dist:
+    driver: local
+

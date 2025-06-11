@@ -16,7 +16,7 @@ export async function removeInvalidKeyValue(
           },
         },
       });
-
+      console.log(meta_column);
       if (!meta_column) return null;
 
       if (

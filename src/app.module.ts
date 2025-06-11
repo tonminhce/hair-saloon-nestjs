@@ -22,6 +22,7 @@ import { SeederService } from './seeder/seeder.service';
 // import { JobsModule } from './jobs/jobs.module';
 // import { TokensModule } from './tokens/tokens.module';
 // import { ZnsModule } from './zns/zns.module';
+import { StoresModule } from './stores/stores.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { SeederService } from './seeder/seeder.service';
     MulterModule.register(),
     // ImageModule,
     ScheduleModule.forRoot(),
+    StoresModule,
     // SurveysModule,
     // EventsModule,
     // MetasModule,

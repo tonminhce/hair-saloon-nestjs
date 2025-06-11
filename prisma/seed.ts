@@ -1,7 +1,7 @@
 import { fakerVI } from '@faker-js/faker';
 import { StoresService } from '../src/stores/stores.service';
 import { PrismaService } from './prisma.service';
-import { StylistsService } from '../src/stylists/stylists.service';
+// import { StylistsService } from '../src/stylists/stylists.service';
 import { Gender, StoreType, StylistStatus, WorkType } from '@prisma/client';
 import { PHONE } from '../src/utils/validateConst';
 
@@ -34,37 +34,37 @@ const main = async () => {
   /**
    * Stylist
    */
-  const prismaStylist = new StylistsService(prismaService);
-  for (let i = 0; i < NUM_STAFF; i++) {
-    const randomizer = Math.random();
-    let role: string;
-    if (randomizer < 0.75) role = 'Stylist';
-    else if (randomizer < 0.9) role = 'Leader';
-    else role = 'Manager';
+//   const prismaStylist = new StylistsService(prismaService);
+//   for (let i = 0; i < NUM_STAFF; i++) {
+//     const randomizer = Math.random();
+//     let role: string;
+//     if (randomizer < 0.75) role = 'Stylist';
+//     else if (randomizer < 0.9) role = 'Leader';
+//     else role = 'Manager';
 
-    await prismaStylist.create(
-      {
-        status:
-          Math.random() <= 0.9 ? StylistStatus.Active : StylistStatus.Inactive,
-        name: fakerVI.person.fullName(),
-        gender: fakerVI.helpers.enumValue(Gender),
-        phone_number: fakerVI.phone
-          .number({ style: 'human' })
-          .replaceAll('-', '')
-          .replaceAll(' ', '')
-          .substring(0, PHONE - 1),
-        date_of_birth: fakerVI.date.birthdate(),
-        email: fakerVI.internet.email(),
-        date_hired: fakerVI.date.recent(),
-        position: role,
-        work_type: Math.random() <= 0.8 ? WorkType.FullTime : WorkType.PartTime,
-        living_area: fakerVI.location.city(),
-        registered_store_id: fakerVI.number.int({ min: 1, max: NUM_STORE }),
-        notes: fakerVI.lorem.sentence(),
-      },
-      true,
-    );
-  }
+//     await prismaStylist.create(
+//       {
+//         status:
+//           Math.random() <= 0.9 ? StylistStatus.Active : StylistStatus.Inactive,
+//         name: fakerVI.person.fullName(),
+//         gender: fakerVI.helpers.enumValue(Gender),
+//         phone_number: fakerVI.phone
+//           .number({ style: 'human' })
+//           .replaceAll('-', '')
+//           .replaceAll(' ', '')
+//           .substring(0, PHONE - 1),
+//         date_of_birth: fakerVI.date.birthdate(),
+//         email: fakerVI.internet.email(),
+//         date_hired: fakerVI.date.recent(),
+//         position: role,
+//         work_type: Math.random() <= 0.8 ? WorkType.FullTime : WorkType.PartTime,
+//         living_area: fakerVI.location.city(),
+//         registered_store_id: fakerVI.number.int({ min: 1, max: NUM_STORE }),
+//         notes: fakerVI.lorem.sentence(),
+//       },
+//       true,
+//     );
+//   }
 };
 
 main().catch((err) => {

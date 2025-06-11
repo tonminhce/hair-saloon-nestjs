@@ -61,7 +61,13 @@ export const filterSoftDeleted = Prisma.defineExtension({
           'findFirstOrThrow',
         ] as const;
 
-        if (operations.includes(operation as (typeof operations)[number])) {
+        // Models that don't have deleted_at field should be excluded
+        const excludedModels = ['Meta', 'Token'] as const;
+
+        if (
+          operations.includes(operation as (typeof operations)[number]) &&
+          !excludedModels.includes(model as any)
+        ) {
           // @ts-expect-error type bound to specific operations, already checked
           args.where = { ...args.where, deleted_at: null };
           return query(args);
