@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-// import { StoresModule } from './stores/stores.module';
-// import { StylistsModule } from './stylists/stylists.module';
 // import { StylistStoresModule } from './stylist-stores/stylist-stores.module';
 import { PrismaModule } from '../prisma/prisma.module';
 // import { TicketsModule } from './tickets/tickets.module';
@@ -23,6 +21,7 @@ import { SeederService } from './seeder/seeder.service';
 // import { TokensModule } from './tokens/tokens.module';
 // import { ZnsModule } from './zns/zns.module';
 import { StoresModule } from './stores/stores.module';
+import { StylistsModule } from './stylists/stylists.module';
 
 @Module({
   imports: [
@@ -39,6 +38,7 @@ import { StoresModule } from './stores/stores.module';
     // ImageModule,
     ScheduleModule.forRoot(),
     StoresModule,
+    StylistsModule,
     // SurveysModule,
     // EventsModule,
     // MetasModule,

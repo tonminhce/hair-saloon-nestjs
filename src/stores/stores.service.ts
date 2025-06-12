@@ -163,22 +163,42 @@ export class StoresService {
     });
   }
 
+  /**
+   * Trash a store
+   * @param id - The ID of the store to trash
+   * @returns The trashed store
+   */
   async trash(id: number) {
     return this.prisma.store.trash({
       id: id,
     });
   }
 
+  /**
+   * Trash multiple stores
+   * @param id - The IDs of the stores to trash
+   * @returns The trashed stores
+   */
   async trashMany(id: number[]) {
     return this.prisma.store.trashMany({
       id: { in: id },
     });
   }
 
+  /**
+   * Restore a store
+   * @param id - The ID of the store to restore
+   * @returns The restored store
+   */
   async restore(id: number | number[]) {
     return this.prisma.store.restore(id);
   }
 
+  /**
+   * Get the next queue ID for a store
+   * @param store_id - The ID of the store
+   * @returns The next queue ID
+   */
   async get_next_queue_id(store_id: number): Promise<number | null> {
     return this.prisma.store
       .findUnique({
@@ -188,6 +208,11 @@ export class StoresService {
       .then((store) => (store ? store.next_queue_id : null));
   }
 
+  /**
+   * Get the total stylist count for a store
+   * @param storeId - The ID of the store
+   * @returns The total stylist count
+   */
   async getTotalStylistCount(storeId: number): Promise<number> {
     // Get data with no soft delete
     return this.prisma.stylist.count({
@@ -198,6 +223,11 @@ export class StoresService {
     });
   }
 
+  /**
+   * Get the total active stylist count for a store
+   * @param storeId - The ID of the store
+   * @returns The total active stylist count
+   */
   async getTotalActiveStylistCount(storeId: number): Promise<number> {
     // Get data with no soft delete
     return this.prisma.stylist.count({
@@ -209,12 +239,12 @@ export class StoresService {
     });
   }
 
-  /*
-   * Private helper functions
-   */
-
+  // Private helper functions
+  
   /**
    * Check if a store with the given ID exists
+   * @param storeId - The ID of the store to check
+   * @returns True if the store exists, false otherwise
    */
   private async _checkIfStoreExists(storeId: number): Promise<boolean> {
     const store = await this.prisma.store.findUnique({
