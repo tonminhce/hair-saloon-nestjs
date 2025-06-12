@@ -104,53 +104,158 @@ export class StylistsService {
     id: number,
     includeStoreName: boolean,
     args?: { [key: string]: number | string | Date },
-  ): Promise<StylistResponse | null> {
-    const whereClause = { id, ...(args || {}) };
-    const includeClause = includeStoreName 
-      ? { store_id: { select: { name: true } } } 
-      : undefined;
-
+  ) {
     const stylist = await this.prisma.stylist.findFirst({
-      where: whereClause,
-      include: includeClause,
+      where: {
+        id: id,
+        ...(args || {}),
+      },
+      include: includeStoreName
+        ? {
+            store_id: {
+              select: {
+                name: true,
+              },
+            },
+          }
+        : undefined,
     });
 
     if (!stylist) return null;
 
-    return this.transformStylistResponse(stylist, includeStoreName);
-  }
-
-  // Private helper functions
-
-  /**
-   * Transform a stylist object to StylistResponse format
-   * @param stylist - The stylist object from database
-   * @param includeStoreName - Whether to include store name
-   * @returns Transformed stylist response
-   */
-  private transformStylistResponse(stylist: any, includeStoreName: boolean): StylistResponse {
-    const baseResponse = {
+    return {
       ...stylist,
       date_of_birth: this.formatDate(stylist.date_of_birth),
       date_hired: this.formatDate(stylist.date_hired),
+      ...(includeStoreName
+        ? {
+            store_name: stylist.store_id?.name,
+            store_id: undefined,
+          }
+        : {}),
     };
-
-    if (includeStoreName) {
-      return {
-        ...baseResponse,
-        store_name: stylist.store_id?.name,
-        store_id: undefined,
-      };
-    }
-
-    return baseResponse;
   }
+
+  /**
+   * Update a stylist
+   * @param id - The ID of the stylist
+   * @param updateStylistDto - The DTO for updating the stylist
+   * @param includeStoreName - Whether to include the store name in the response
+   * @returns The updated stylist
+   */
+  async update(
+    id: number,
+    updateStylistDto: UpdateStylistDto,
+    includeStoreName: boolean,
+  ) {
+    return this.prismaService.$transaction(async (prisma) => {
+      if (updateStylistDto.custom_data) {
+        updateStylistDto.custom_data = await removeInvalidKeyValue(
+          prisma,
+          AllowedModel.stylist,
+          updateStylistDto.custom_data,
+        );
+      }
+
+      const updatedStylist = await prisma.stylist.update({
+        where: {
+          id: id,
+        },
+        data: updateStylistDto,
+        include: includeStoreName
+          ? {
+              store_id: {
+                select: {
+                  name: true,
+                },
+              },
+            }
+          : undefined,
+      });
+
+      return {
+        ...updatedStylist,
+        date_of_birth: this.formatDate(updatedStylist.date_of_birth),
+        date_hired: this.formatDate(updatedStylist.date_hired),
+        ...(includeStoreName
+          ? {
+              store_name: updatedStylist.store_id?.name,
+              store_id: undefined,
+            }
+          : {}),
+      };
+    });
+  }
+
+  /**
+   * Trash a stylist
+   * @param id - The ID of the stylist
+   * @returns The deleted stylist
+   */
+  async trash(id: number) {
+    return this.prismaService.$transaction(async (prisma) => {
+      await prisma.stylistStore.deleteMany({
+        where: { stylist_id: id },
+      });
+      return prisma.stylist.delete({
+        where: { id },
+      });
+    });
+  }
+
+  /**
+   * Trash many stylists
+   * @param id - The IDs of the stylists
+   * @returns The deleted stylists
+   */
+  async trashMany(id: number[]) {
+    return this.prismaService.$transaction(async (prisma) => {
+      // First, delete any associated StylistStore records
+      await prisma.stylistStore.deleteMany({
+        where: { stylist_id: { in: id } },
+      });
+
+      // Then delete the stylists
+      return prisma.stylist.deleteMany({
+        where: {
+          id: { in: id },
+        },
+      });
+    });
+  }
+
+  /**
+   * Restore a stylist
+   * @param id - The ID of the stylist
+   * @returns The restored stylist
+   */
+  async restore(id: number | number[]) {
+    return await this.prisma.stylist.restore(id);
+  }
+
+  /**
+   * Search for stylists
+   * @param name_like - The name to search for
+   * @returns The stylists
+   */
+  async search(name_like: string) {
+    return await this.prisma.stylist.findMany({
+      where: {
+        name: {
+          contains: name_like,
+          mode: 'insensitive',
+        },
+      },
+    });
+  }
+  // Private helper functions
 
   /**
    * Format date to YYYY-MM-DD
    * @param date - The date to format
    * @returns The formatted date
    */
+
   private formatDate(date: Date | null): string | null {
     if (!date) return null;
     return date.toISOString().split('T')[0];
